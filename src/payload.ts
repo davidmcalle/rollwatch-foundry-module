@@ -4,6 +4,7 @@ import type {
   Author,
   ActorInfo,
   CollectedData,
+  ItemInfo,
   MessageEvent,
   WorldInfo,
   SystemInfo,
@@ -72,6 +73,50 @@ function actorOf(message: ChatMessage): ActorInfo | null {
   };
 }
 
+/** Resolve a document uuid on this client; null if it's gone or unresolvable. */
+function resolveUuid(uuid: string | undefined): { name?: string; img?: string } | null {
+  if (!uuid) return null;
+  const resolver = (globalThis as { fromUuidSync?: (u: string) => unknown }).fromUuidSync;
+  if (!resolver) return null;
+  try {
+    return (resolver(uuid) as { name?: string; img?: string } | null) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+type Dnd5eRef = { type?: string; id?: string; uuid?: string };
+
+/**
+ * The item (weapon/spell/feat/consumable) behind the message, with its display
+ * name resolved client-side — the backend can't dereference Foundry uuids, and
+ * `flags.dnd5e.item` only carries id/uuid/type. Covers usage cards and
+ * midi-qol attack messages alike. Null when the message has no item.
+ */
+function itemOf(message: ChatMessage): ItemInfo | null {
+  const dnd5e = (message.flags as { dnd5e?: { item?: Dnd5eRef; activity?: Dnd5eRef } } | undefined)
+    ?.dnd5e;
+  const ref = dnd5e?.item;
+  if (!ref?.uuid) return null;
+  const item = resolveUuid(ref.uuid);
+  const activityRef = dnd5e?.activity;
+  const activity = resolveUuid(activityRef?.uuid);
+  return {
+    id: ref.id ?? "",
+    uuid: ref.uuid,
+    type: ref.type ?? "",
+    name: item?.name ?? "",
+    image: absoluteUrl(item?.img),
+    activity: activityRef
+      ? {
+          id: activityRef.id ?? "",
+          type: activityRef.type ?? "",
+          name: activity?.name ?? "",
+        }
+      : null,
+  };
+}
+
 function worldOf(): WorldInfo {
   const w = game?.world;
   let image = "";
@@ -107,6 +152,7 @@ function buildCollectedData(message: ChatMessage): CollectedData {
     messageCreatedAt: new Date(message.timestamp),
     author: authorOf(message),
     actor: actorOf(message),
+    item: itemOf(message),
     visibility: {
       whisper: (message.whisper ?? []) as string[],
       blind: message.blind ?? false,

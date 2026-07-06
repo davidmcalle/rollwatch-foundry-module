@@ -27,6 +27,25 @@ export type ActorInfo = {
   token: TokenInfo | null;
 };
 
+// The activity (attack/heal/utility/…) that produced the message, name resolved
+// client-side from its uuid.
+type ActivityInfo = {
+  id: string;
+  type: string;
+  name: string;
+};
+
+// The item behind the message (weapon/spell/feat/consumable), name + image
+// resolved client-side — the backend can't dereference Foundry uuids.
+export type ItemInfo = {
+  id: string;
+  uuid: string;
+  type: string;
+  name: string;
+  image: string;
+  activity: ActivityInfo | null;
+};
+
 type Visibility = {
   whisper: string[];
   blind: boolean;
@@ -50,6 +69,7 @@ export type CollectedData = {
   messageCreatedAt: Date;
   author: Author | null;
   actor: ActorInfo | null;
+  item: ItemInfo | null;
   visibility: Visibility;
   world: WorldInfo;
   system: SystemInfo;
